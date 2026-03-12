@@ -1,11 +1,8 @@
-let sessionId = "";
-
-const pdfFileInput = document.querySelector("#pdfFile");
-const uploadBtn = document.querySelector("#uploadBtn");
-const uploadStatus = document.querySelector("#uploadStatus");
-const questionInput = document.querySelector("#question");
-const askBtn = document.querySelector("#askBtn");
-const answerPre = document.querySelector("#answer");
+const docxFileInput = document.querySelector("#docxFile");
+const reviewBtn = document.querySelector("#reviewBtn");
+const statusPre = document.querySelector("#status");
+const issuesPre = document.querySelector("#issues");
+const downloadLink = document.querySelector("#downloadLink");
 
 async function fileToBase64(file) {
   const buffer = await file.arrayBuffer();
@@ -19,99 +16,67 @@ async function fileToBase64(file) {
   return btoa(binary);
 }
 
-function extractAnswerText(raw) {
-  if (!raw || typeof raw !== "object") return "";
-
-  const candidates = [
-    raw.answer,
-    raw.text,
-    raw.output,
-    raw.response,
-    raw.message,
-    raw.data?.answer,
-    raw.data?.text,
-    raw.result?.answer,
-    raw.result?.text
-  ];
-
-  for (const item of candidates) {
-    if (typeof item === "string" && item.trim()) {
-      return item;
-    }
+function base64ToBlob(base64, mimeType) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
   }
-
-  return "";
+  return new Blob([bytes], { type: mimeType });
 }
 
-uploadBtn.addEventListener("click", async () => {
-  const file = pdfFileInput.files?.[0];
+reviewBtn.addEventListener("click", async () => {
+  const file = docxFileInput.files?.[0];
   if (!file) {
-    uploadStatus.textContent = "请先选择 PDF 文件。";
+    statusPre.textContent = "请先选择 .docx 文件。";
     return;
   }
 
-  if (file.type !== "application/pdf") {
-    uploadStatus.textContent = "仅支持 application/pdf。";
+  if (!file.name.toLowerCase().endsWith(".docx")) {
+    statusPre.textContent = "仅支持 .docx 合同文件。";
     return;
   }
 
-  uploadStatus.textContent = "上传中...";
+  statusPre.textContent = "审查中...";
+  issuesPre.textContent = "正在分析条款，请稍候...";
+  downloadLink.classList.add("hidden");
 
   try {
     const contentBase64 = await fileToBase64(file);
 
-    const response = await fetch("/api/upload", {
+    const response = await fetch("/api/review-contract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         filename: file.name,
-        mimeType: file.type,
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         contentBase64
       })
     });
 
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || "上传失败");
+      throw new Error(payload.error || "审查失败");
     }
 
-    sessionId = payload.sessionId;
-    uploadStatus.textContent = `上传成功\n会话ID: ${sessionId}\nsourceId: ${payload.sourceId || "(API未返回)"}`;
+    statusPre.textContent = `审查完成：共生成 ${payload.issues.length} 条批注。`;
+    issuesPre.textContent = payload.issues.length
+      ? payload.issues.map((item, index) => `${index + 1}. 第 ${item.paragraphIndex + 1} 段\n原文：${item.text}\n建议：${item.comment}`).join("\n\n")
+      : "未识别到风险点。";
+
+    const blob = base64ToBlob(
+      payload.reviewedBase64,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+
+    const reviewedUrl = URL.createObjectURL(blob);
+    downloadLink.href = reviewedUrl;
+    downloadLink.download = payload.reviewedFilename || "reviewed-contract.docx";
+    downloadLink.textContent = "点击下载审查后的合同（批注版）";
+    downloadLink.classList.remove("hidden");
   } catch (error) {
-    uploadStatus.textContent = `上传失败: ${error.message}`;
-  }
-});
-
-askBtn.addEventListener("click", async () => {
-  const question = questionInput.value.trim();
-  if (!sessionId) {
-    answerPre.textContent = "请先上传 PDF。";
-    return;
-  }
-  if (!question) {
-    answerPre.textContent = "请输入法律问题。";
-    return;
-  }
-
-  answerPre.textContent = "提问中...";
-
-  try {
-    const response = await fetch("/api/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, question })
-    });
-
-    const payload = await response.json();
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || "提问失败");
-    }
-
-    const text = extractAnswerText(payload.answerRaw);
-    answerPre.textContent = text
-      ? `【法条原文回答】\n${text}\n\n--- 原始响应 ---\n${JSON.stringify(payload.answerRaw, null, 2)}`
-      : `未在常见字段中提取到文本，请查看原始响应：\n${JSON.stringify(payload.answerRaw, null, 2)}`;
-  } catch (error) {
-    answerPre.textContent = `提问失败: ${error.message}`;
+    statusPre.textContent = `审查失败: ${error.message}`;
+    issuesPre.textContent = "请修复问题后重试。";
   }
 });
