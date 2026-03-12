@@ -1,0 +1,11 @@
+{
+  "name": "codex-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NotebookLM 法条 PDF 问答示例（前后端）",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "check": "node --check src/notebooklmClient.mjs && node --check src/server.mjs && node --check public/app.js"
+  }
+}
