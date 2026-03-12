@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { NotebookLMClient } from "./notebooklmClient.mjs";
 
@@ -9,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const publicDir = path.join(rootDir, "public");
+const reviewScript = path.join(rootDir, "scripts", "review_docx.py");
 
 const PORT = Number(process.env.PORT || 8787);
 
@@ -40,6 +42,43 @@ async function readJsonBody(req) {
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   return raw ? JSON.parse(raw) : {};
+}
+
+function runContractReview(contentBase64) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn("python3", [reviewScript], { stdio: ["pipe", "pipe", "pipe"] });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
+
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+    });
+
+    proc.on("error", (error) => {
+      reject(error);
+    });
+
+    proc.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr || `审查脚本退出码: ${code}`));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        reject(new Error("审查脚本返回了无效 JSON"));
+      }
+    });
+
+    proc.stdin.write(JSON.stringify({ contentBase64 }));
+    proc.stdin.end();
+  });
 }
 
 async function serveStatic(req, res) {
@@ -87,6 +126,32 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         message: "server up",
         notebooklmBaseUrl: client.baseUrl
+      });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/review-contract") {
+      const body = await readJsonBody(req);
+      const { filename, mimeType, contentBase64 } = body;
+
+      if (!filename || !contentBase64) {
+        json(res, 400, { error: "filename 和 contentBase64 必填" });
+        return;
+      }
+
+      if (mimeType && mimeType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        json(res, 400, { error: "仅支持 .docx 文件" });
+        return;
+      }
+
+      const review = await runContractReview(contentBase64);
+
+      json(res, 200, {
+        ok: true,
+        filename,
+        reviewedFilename: filename.replace(/\.docx$/i, "") + "-reviewed.docx",
+        reviewedBase64: review.reviewedBase64,
+        issues: review.issues
       });
       return;
     }
@@ -172,5 +237,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`法律问答前后端示例已启动: http://localhost:${PORT}`);
+  console.log(`合同审查工具已启动: http://localhost:${PORT}`);
 });

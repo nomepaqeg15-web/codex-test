@@ -9,7 +9,7 @@ body {
 }
 
 .container {
-  max-width: 900px;
+  max-width: 920px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -20,13 +20,6 @@ body {
   border-radius: 12px;
   padding: 16px;
   margin-top: 16px;
-}
-
-textarea {
-  width: 100%;
-  min-height: 120px;
-  resize: vertical;
-  margin-top: 8px;
 }
 
 button {
@@ -41,4 +34,16 @@ pre {
   border-radius: 8px;
   padding: 12px;
   overflow: auto;
+  white-space: pre-wrap;
+}
+
+.download-link {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.hidden {
+  display: none;
 }

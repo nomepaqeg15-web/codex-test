@@ -1,32 +1,22 @@
 # codex-test
 
-这是一个**前后端一体**示例，满足你要的流程：
+这是一个合同审查工具（前后端一体）：
 
-1. 后端读取你上传的 PDF（法条文件）并调用 NotebookLM API 上传。
-2. 前端输入法律问题。
-3. 后端调用 NotebookLM API 问答，并返回法条原文相关内容。
-
----
-
-## 1) 环境变量
-
-```bash
-cp .env.example .env
-source .env
-```
-
-关键变量：
-
-- `NOTEBOOKLM_BASE_URL`：你的 `notebooklm-ts-api` 服务地址
-- `NOTEBOOKLM_API_KEY`：可选
-- `NOTEBOOKLM_UPLOAD_ENDPOINT`：上传 PDF 的 API 路径（默认 `/api/files/upload`）
-- `NOTEBOOKLM_CHAT_ENDPOINT`：问答 API 路径（默认 `/api/chat`）
-
-> 不同版本的 `notebooklm-ts-api` 路径可能不同，按实际接口改 `.env` 即可。
+1. 上传 `.docx` 合同文件。
+2. 后端进行规则化风险扫描。
+3. 返回带 **Word 批注** 的新合同版本，供你在 Word 中直接查看修改意见。
 
 ---
 
-## 2) 启动
+## 0) 我应该在哪里输入命令？
+
+- 在 **终端** 输入命令（如 `npm start`），不要在浏览器地址栏输入。
+- 启动后再在浏览器访问 `http://localhost:8787`。
+- 页面第一步是“上传合同（.docx）”，这是点选文件，不是手动输入文本。
+
+---
+
+## 1) 启动
 
 ```bash
 npm start
@@ -36,34 +26,35 @@ npm start
 
 ---
 
-## 3) 使用方式
+## 2) 使用方式
 
-1. 在页面选择 PDF（法条文件）并点击“上传并建会话”。
-2. 输入法律问题（例如“合同违约责任如何规定？”）并点击“提问”。
-3. 页面会展示提取出的回答文本，并附带完整原始响应，便于你核对法条原文。
+1. 在页面选择合同文件（`.docx`）。
+2. 点击“开始审查”。
+3. 页面会展示审查摘要，并提供“下载审查后的合同（批注版）”链接。
+4. 使用 Microsoft Word/WPS 打开下载后的文件，查看批注内容。
 
 ---
 
 ## 项目结构
 
-- `src/server.mjs`：后端服务（静态页面 + `/api/upload` + `/api/ask`）
-- `src/notebooklmClient.mjs`：调用 NotebookLM API（上传 PDF / 法律问答）
+- `src/server.mjs`：后端服务（静态页面 + `/api/review-contract`）
+- `scripts/review_docx.py`：合同审查脚本（读取 docx，生成批注）
 - `public/index.html`：前端页面
-- `public/app.js`：前端逻辑（上传 + 提问）
+- `public/app.js`：前端逻辑（上传 + 审查 + 下载）
 - `public/styles.css`：页面样式
 
 ---
 
-## 后端 API（本示例）
+## 后端 API
 
-### `POST /api/upload`
+### `POST /api/review-contract`
 
 请求体：
 
 ```json
 {
-  "filename": "civil-law.pdf",
-  "mimeType": "application/pdf",
+  "filename": "contract.docx",
+  "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "contentBase64": "..."
 }
 ```
@@ -73,29 +64,15 @@ npm start
 ```json
 {
   "ok": true,
-  "sessionId": "...",
-  "sourceId": "...",
-  "uploadRaw": {}
+  "filename": "contract.docx",
+  "reviewedFilename": "contract-reviewed.docx",
+  "reviewedBase64": "...",
+  "issues": [
+    {
+      "paragraphIndex": 3,
+      "text": "...",
+      "comment": "..."
+    }
+  ]
 }
 ```
-
-### `POST /api/ask`
-
-请求体：
-
-```json
-{
-  "sessionId": "...",
-  "question": "合同违约责任在法条中如何规定？"
-}
-```
-
-返回：
-
-```json
-{
-  "ok": true,
-  "answerRaw": {}
-}
-```
-
