@@ -3,26 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>法条 PDF 问答示例</title>
+    <title>合同审查助手</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="container">
-      <h1>法条 PDF 问答示例</h1>
-      <p>先上传 PDF（法条文件），再输入法律问题，系统会调用 NotebookLM API 返回相关法条原文。</p>
+      <h1>合同审查助手（Word 批注版）</h1>
+      <p>上传 .docx 合同文件，系统会生成一个带批注的审查版合同，便于你在 Word 中直接查看和修改。</p>
 
       <section class="card">
-        <h2>1. 上传法条 PDF</h2>
-        <input id="pdfFile" type="file" accept="application/pdf" />
-        <button id="uploadBtn">上传并建会话</button>
-        <pre id="uploadStatus">尚未上传</pre>
+        <h2>1. 上传合同（.docx）</h2>
+        <input id="docxFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+        <button id="reviewBtn">开始审查</button>
+        <pre id="status">尚未上传</pre>
       </section>
 
       <section class="card">
-        <h2>2. 提问法律问题</h2>
-        <textarea id="question" placeholder="例如：合同违约责任在法条中如何规定？"></textarea>
-        <button id="askBtn">提问</button>
-        <pre id="answer">等待提问...</pre>
+        <h2>2. 审查结果</h2>
+        <a id="downloadLink" class="download-link hidden" download>下载审查后的合同</a>
+        <pre id="issues">等待审查...</pre>
       </section>
     </main>
 
